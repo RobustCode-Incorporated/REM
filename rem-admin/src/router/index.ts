@@ -19,6 +19,14 @@ const routes = [
         component: () =>
           import('../modules/sales/pages/SalesPage.vue'),
       },
+
+      // ✅ INVENTORY MODULE (FIX IMPORTANT)
+      {
+        path: 'inventory',
+        name: 'inventory',
+        component: () =>
+          import('../pages/inventory/InventoryPage.vue'),
+      },
     ],
   },
 

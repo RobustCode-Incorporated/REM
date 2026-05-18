@@ -1,11 +1,14 @@
 import { Router } from 'express'
-import { db } from '../db'
+import {
+  getCustomers,
+  createCustomer,
+  deleteCustomer,
+} from '../controllers/customers.controller'
 
 const router = Router()
 
-router.get('/', async (req, res) => {
-  const result = await db.query('SELECT * FROM customers')
-  res.json(result.rows)
-})
+router.get('/', getCustomers)
+router.post('/', createCustomer)
+router.delete('/:id', deleteCustomer)
 
 export default router
