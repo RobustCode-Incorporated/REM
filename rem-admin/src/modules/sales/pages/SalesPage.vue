@@ -4,7 +4,7 @@
     <!-- HEADER -->
     <div>
       <h1 class="text-2xl font-bold">Sales</h1>
-      <p class="text-gray-500">Create and manage sales</p>
+      <p class="text-gray-500">ERP Sales Management Module</p>
     </div>
 
     <!-- CREATE SALE -->
@@ -12,47 +12,41 @@
 
       <h3 class="font-semibold">Create Sale</h3>
 
-      <!-- CUSTOMER -->
       <select v-model="customerId" class="border p-2 rounded w-full">
         <option disabled value="">Select customer</option>
-        <option
-          v-for="c in store.customers"
-          :key="c.id"
-          :value="c.id"
-        >
+
+        <option v-for="c in customers" :key="c.id" :value="c.id">
           {{ c.name }}
         </option>
       </select>
 
-      <!-- PRODUCTS -->
       <div class="space-y-2">
         <label class="text-sm text-gray-500">Products</label>
 
-        <div
-          v-for="p in store.products"
-          :key="p.id"
-          class="flex items-center gap-2"
-        >
-          <input
-            type="checkbox"
-            :value="p.id"
-            v-model="productIds"
-          />
+        <div v-for="p in products" :key="p.id" class="flex gap-2">
+          <input type="checkbox" :value="p.id" v-model="productIds" />
           <span>{{ p.name }} - €{{ p.price }}</span>
         </div>
       </div>
 
-      <!-- BUTTON -->
-      <BaseButton @click="createSale">
-        Create Sale
+      <BaseButton @click="createSale" :disabled="loading">
+        {{ loading ? 'Creating...' : 'Create Sale' }}
       </BaseButton>
+
+      <p v-if="error" class="text-red-500 text-sm">
+        {{ error }}
+      </p>
 
     </BaseCard>
 
     <!-- SALES LIST -->
     <BaseCard>
 
-      <table class="w-full text-sm">
+      <div v-if="loadingSales" class="text-gray-400">
+        Loading sales...
+      </div>
+
+      <table v-else class="w-full text-sm">
         <thead>
           <tr class="text-left text-gray-500 border-b">
             <th>ID</th>
@@ -64,19 +58,16 @@
         </thead>
 
         <tbody>
-          <tr
-            v-for="sale in store.sales"
-            :key="sale.id"
-            class="border-b"
-          >
+          <tr v-for="sale in sales" :key="sale.id" class="border-b">
             <td>{{ sale.id }}</td>
-            <td>{{ sale.customer?.name }}</td>
+            <td>{{ sale.customer_name }}</td>
             <td>€{{ sale.total }}</td>
-            <td>{{ sale.date }}</td>
+            <td>{{ sale.created_at }}</td>
+
             <td>
               <button
                 class="text-red-500"
-                @click="store.deleteSale(sale.id)"
+                @click="deleteSale(sale.id)"
               >
                 delete
               </button>
@@ -92,22 +83,85 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import BaseCard from '../../../components/ui/BaseCard.vue'
 import BaseButton from '../../../components/ui/BaseButton.vue'
-import { useSalesStore } from '../store/sales.store'
+import { SalesAPI } from '../services/sales.api'
+import { api } from '../../../services/api'
 
-const store = useSalesStore()
+// STATE
+const sales = ref<any[]>([])
+const customers = ref<any[]>([])
+const products = ref<any[]>([])
 
 const customerId = ref('')
 const productIds = ref<string[]>([])
 
-function createSale() {
+const loading = ref(false)
+const loadingSales = ref(false)
+const error = ref('')
+
+// LOAD DATA
+onMounted(async () => {
+  await loadAll()
+})
+
+async function loadAll() {
+  loadingSales.value = true
+
+  try {
+    const [salesRes, customersRes, productsRes] = await Promise.all([
+      SalesAPI.getSales(),
+      api.get('/customers'),
+      api.get('/products'),
+    ])
+
+    sales.value = salesRes
+    customers.value = customersRes.data
+    products.value = productsRes.data
+
+  } catch (e) {
+    error.value = 'Failed to load data'
+  }
+
+  loadingSales.value = false
+}
+
+// CREATE SALE
+async function createSale() {
   if (!customerId.value || productIds.value.length === 0) return
 
-  store.addSale(customerId.value, productIds.value)
+  loading.value = true
+  error.value = ''
 
-  customerId.value = ''
-  productIds.value = []
+  try {
+    await SalesAPI.createSale({
+      customer_id: customerId.value,
+      products: productIds.value.map(id => ({
+        productId: id,
+        quantity: 1
+      }))
+    })
+
+    await loadAll()
+
+    customerId.value = ''
+    productIds.value = []
+
+  } catch (e) {
+    error.value = 'Failed to create sale'
+  }
+
+  loading.value = false
+}
+
+// DELETE
+async function deleteSale(id: string) {
+  try {
+    await SalesAPI.deleteSale(id)
+    await loadAll()
+  } catch (e) {
+    error.value = 'Failed to delete sale'
+  }
 }
 </script>
