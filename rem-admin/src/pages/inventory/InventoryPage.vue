@@ -31,14 +31,26 @@
         class="border p-2 rounded w-full"
       />
 
-      <BaseButton @click="createProduct">
-        Add Product
+      <BaseButton
+        @click="handleCreateProduct"
+        :disabled="loading"
+      >
+        {{ loading ? 'Creating...' : 'Add Product' }}
       </BaseButton>
     </BaseCard>
 
     <!-- PRODUCT LIST -->
     <BaseCard>
-      <table class="w-full text-sm">
+
+      <div v-if="store.loading" class="text-gray-400 p-4">
+        Loading products...
+      </div>
+
+      <div v-else-if="!store.products.length" class="text-gray-400 p-4">
+        No products yet.
+      </div>
+
+      <table v-else class="w-full text-sm">
         <thead>
           <tr class="text-left text-gray-500 border-b">
             <th>Name</th>
@@ -60,9 +72,7 @@
             <td>{{ p.stock }}</td>
 
             <td>
-              <span
-                :class="p.stock <= 5 ? 'text-red-500' : 'text-green-600'"
-              >
+              <span :class="p.stock <= 5 ? 'text-red-500' : 'text-green-600'">
                 {{ p.stock <= 5 ? 'LOW' : 'OK' }}
               </span>
             </td>
@@ -70,7 +80,8 @@
             <td>
               <button
                 class="text-red-500"
-                @click="store.deleteProduct(p.id)"
+                @click="handleDeleteProduct(p.id)"
+                :disabled="loading"
               >
                 delete
               </button>
@@ -78,6 +89,7 @@
           </tr>
         </tbody>
       </table>
+
     </BaseCard>
 
   </div>
@@ -94,22 +106,56 @@ const store = useProductsStore()
 const name = ref('')
 const price = ref(0)
 const stock = ref(0)
+const loading = ref(false)
 
-function createProduct() {
+/**
+ * CREATE PRODUCT
+ */
+async function handleCreateProduct() {
   if (!name.value || price.value <= 0) return
 
-  store.addProduct({
-    name: name.value,
-    price: price.value,
-    stock: stock.value,
-  })
+  loading.value = true
 
-  name.value = ''
-  price.value = 0
-  stock.value = 0
+  try {
+    await store.createProduct({
+      name: name.value,
+      price: price.value,
+      stock: stock.value,
+    })
+
+    name.value = ''
+    price.value = 0
+    stock.value = 0
+  } catch (err) {
+    console.error('CREATE PRODUCT FAILED:', err)
+  } finally {
+    loading.value = false
+  }
 }
 
-onMounted(() => {
-  store.loadProducts()
+/**
+ * DELETE PRODUCT
+ */
+async function handleDeleteProduct(id: string) {
+  loading.value = true
+
+  try {
+    await store.deleteProduct(id)
+  } catch (err) {
+    console.error('DELETE PRODUCT FAILED:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * LOAD PRODUCTS
+ */
+onMounted(async () => {
+  try {
+    await store.loadProducts()
+  } catch (err) {
+    console.error('LOAD PRODUCTS FAILED:', err)
+  }
 })
 </script>

@@ -8,10 +8,19 @@ import dashboardRoutes from './routes/dashboard.routes'
 
 const app = express()
 
-app.use(cors())
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://opulent-journey-4jwwjx6w66xx3jvv5-5173.app.github.dev',
+]
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}))
+
 app.use(express.json())
 
-// ROUTES
 app.use('/customers', customersRoutes)
 app.use('/products', productsRoutes)
 app.use('/sales', salesRoutes)

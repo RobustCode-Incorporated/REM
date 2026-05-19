@@ -34,7 +34,7 @@
 
     </div>
 
-    <!-- OVERVIEW SECTION -->
+    <!-- OVERVIEW -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
       <BaseCard>
@@ -61,18 +61,22 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, computed } from 'vue'
 import BaseCard from '../../components/ui/BaseCard.vue'
-import { DashboardAPI } from '../../services/dashboard.api'
+import { useDashboardStore } from '../../store/dashboard.store'
 
-const kpis = ref({
-  totalSales: 0,
-  orders: 0,
-  customers: 0,
-  stockAlerts: 0,
-})
+// STORE
+const store = useDashboardStore()
 
+// KPI reactive (computed = clean + performant)
+const kpis = computed(() => store.kpis)
+
+// LOAD DATA
 onMounted(async () => {
-  kpis.value = await DashboardAPI.getKpis()
+  try {
+    await store.loadKpis()
+  } catch (err) {
+    console.error('DASHBOARD KPI LOAD FAILED:', err)
+  }
 })
 </script>

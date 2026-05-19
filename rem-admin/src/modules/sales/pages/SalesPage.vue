@@ -29,8 +29,11 @@
         </div>
       </div>
 
-      <BaseButton @click="createSale" :disabled="loading">
-        {{ loading ? 'Creating...' : 'Create Sale' }}
+      <BaseButton
+        @click="createSale"
+        :disabled="store.loading"
+      >
+        {{ store.loading ? 'Creating...' : 'Create Sale' }}
       </BaseButton>
 
       <p v-if="error" class="text-red-500 text-sm">
@@ -42,8 +45,12 @@
     <!-- SALES LIST -->
     <BaseCard>
 
-      <div v-if="loadingSales" class="text-gray-400">
+      <div v-if="store.loadingSales" class="text-gray-400">
         Loading sales...
+      </div>
+
+      <div v-else-if="!sales.length" class="text-gray-400">
+        No sales yet
       </div>
 
       <table v-else class="w-full text-sm">
@@ -59,10 +66,10 @@
 
         <tbody>
           <tr v-for="sale in sales" :key="sale.id" class="border-b">
-            <td>{{ sale.id }}</td>
-            <td>{{ sale.customer_name }}</td>
+            <td>{{ sale.id.slice(0, 6) }}</td>
+            <td>{{ sale.customer_name ?? 'Unknown' }}</td>
             <td>€{{ sale.total }}</td>
-            <td>{{ sale.created_at }}</td>
+            <td>{{ formatDate(sale.created_at) }}</td>
 
             <td>
               <button
@@ -74,7 +81,6 @@
             </td>
           </tr>
         </tbody>
-
       </table>
 
     </BaseCard>
@@ -83,85 +89,82 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import BaseCard from '../../../components/ui/BaseCard.vue'
 import BaseButton from '../../../components/ui/BaseButton.vue'
-import { SalesAPI } from '../services/sales.api'
-import { api } from '../../../services/api'
+import { useSalesStore } from '../store/sales.store'
+import { useProductsStore } from '../../../store/products.store'
+import { useCustomersStore } from '../../../store/customers.store'
 
-// STATE
-const sales = ref<any[]>([])
-const customers = ref<any[]>([])
-const products = ref<any[]>([])
+// STORES
+const store = useSalesStore()
+const productsStore = useProductsStore()
+const customersStore = useCustomersStore()
 
+// LOCAL STATE
 const customerId = ref('')
 const productIds = ref<string[]>([])
-
-const loading = ref(false)
-const loadingSales = ref(false)
 const error = ref('')
 
-// LOAD DATA
+// COMPUTED DATA
+const sales = computed(() => store.sales)
+const products = computed(() => productsStore.products)
+const customers = computed(() => customersStore.customers)
+
+/**
+ * LOAD ALL DATA
+ */
 onMounted(async () => {
-  await loadAll()
+  try {
+    await Promise.all([
+      store.loadSales(),
+      productsStore.loadProducts(),
+      customersStore.loadCustomers(),
+    ])
+  } catch (err) {
+    console.error(err)
+  }
 })
 
-async function loadAll() {
-  loadingSales.value = true
-
-  try {
-    const [salesRes, customersRes, productsRes] = await Promise.all([
-      SalesAPI.getSales(),
-      api.get('/customers'),
-      api.get('/products'),
-    ])
-
-    sales.value = salesRes
-    customers.value = customersRes.data
-    products.value = productsRes.data
-
-  } catch (e) {
-    error.value = 'Failed to load data'
-  }
-
-  loadingSales.value = false
-}
-
-// CREATE SALE
+/**
+ * CREATE SALE
+ */
 async function createSale() {
   if (!customerId.value || productIds.value.length === 0) return
 
-  loading.value = true
-  error.value = ''
-
   try {
-    await SalesAPI.createSale({
+    await store.createSale({
       customer_id: customerId.value,
       products: productIds.value.map(id => ({
         productId: id,
-        quantity: 1
-      }))
+        quantity: 1,
+      })),
     })
-
-    await loadAll()
 
     customerId.value = ''
     productIds.value = []
-
-  } catch (e) {
+  } catch (err) {
+    console.error(err)
     error.value = 'Failed to create sale'
   }
-
-  loading.value = false
 }
 
-// DELETE
+/**
+ * DELETE SALE
+ */
 async function deleteSale(id: string) {
   try {
-    await SalesAPI.deleteSale(id)
-    await loadAll()
-  } catch (e) {
+    await store.deleteSale(id)
+  } catch (err) {
+    console.error(err)
     error.value = 'Failed to delete sale'
   }
+}
+
+/**
+ * FORMAT DATE
+ */
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString()
 }
 </script>
