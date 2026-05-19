@@ -13,11 +13,13 @@ router.get('/kpis', async (_req, res) => {
     `)
 
     const customers = await pool.query(`
-      SELECT COUNT(*) as total_customers FROM customers
+      SELECT COUNT(*) as total_customers
+      FROM customers
     `)
 
     const products = await pool.query(`
-      SELECT COUNT(*) as total_products FROM products
+      SELECT COUNT(*) as total_products
+      FROM products
     `)
 
     const stockAlerts = await pool.query(`
@@ -34,8 +36,11 @@ router.get('/kpis', async (_req, res) => {
       stockAlerts: stockAlerts.rows[0].low_stock,
     })
   } catch (err) {
-    console.error('DASHBOARD ERROR:', err)
-    return res.status(500).json({ error: 'Dashboard error' })
+    console.error('🔥 DASHBOARD KPI ERROR:', err)
+
+    return res.status(500).json({
+      error: 'Dashboard error',
+    })
   }
 })
 

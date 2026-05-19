@@ -1,14 +1,14 @@
 import { Router } from 'express'
-import { db } from '../db'
+import { pool } from '../db'
 
 const router = Router()
 
-/**
- * GET ALL SALES (with customer info)
- */
-router.get('/', async (req, res) => {
+// =========================
+// GET ALL SALES
+// =========================
+router.get('/', async (_req, res) => {
   try {
-    const result = await db.query(`
+    const result = await pool.query(`
       SELECT 
         s.id,
         s.total,
@@ -20,50 +20,68 @@ router.get('/', async (req, res) => {
       ORDER BY s.created_at DESC
     `)
 
-    res.json(result.rows)
+    return res.json(result.rows)
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch sales' })
+    console.error('🔥 SALES GET ERROR:', err)
+
+    return res.status(500).json({
+      error: 'Failed to fetch sales',
+      details: err instanceof Error ? err.message : err,
+    })
   }
 })
 
-/**
- * CREATE SALE (TRANSACTION)
- */
+// =========================
+// CREATE SALE (TRANSACTION SAFE)
+// =========================
 router.post('/', async (req, res) => {
-  const client = await db.connect()
+  const client = await pool.connect()
 
   try {
-    await client.query('BEGIN')
-
     const { customer_id, products } = req.body
 
-    /**
-     * 1. CREATE SALE HEADER
-     */
+    // =========================
+    // VALIDATION BASIC
+    // =========================
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({
+        error: 'Products array is required',
+      })
+    }
+
+    await client.query('BEGIN')
+
+    // =========================
+    // CREATE SALE HEADER
+    // =========================
     const saleResult = await client.query(
       `
       INSERT INTO sales (customer_id, total)
       VALUES ($1, 0)
       RETURNING *
       `,
-      [customer_id]
+      [customer_id || null]
     )
 
     const sale = saleResult.rows[0]
-
     let total = 0
 
-    /**
-     * 2. INSERT SALE ITEMS
-     */
+    // =========================
+    // INSERT ITEMS
+    // =========================
     for (const item of products) {
       const productRes = await client.query(
         `SELECT price FROM products WHERE id = $1`,
         [item.productId]
       )
 
-      const price = productRes.rows[0].price
-      const quantity = item.quantity || 1
+      // 🔴 SAFE CHECK (IMPORTANT FIX)
+      if (productRes.rows.length === 0) {
+        throw new Error(`Product not found: ${item.productId}`)
+      }
+
+      const price = Number(productRes.rows[0].price)
+      const quantity = Number(item.quantity || 1)
 
       total += price * quantity
 
@@ -76,9 +94,9 @@ router.post('/', async (req, res) => {
       )
     }
 
-    /**
-     * 3. UPDATE TOTAL
-     */
+    // =========================
+    // UPDATE TOTAL
+    // =========================
     await client.query(
       `UPDATE sales SET total = $1 WHERE id = $2`,
       [total, sale.id]
@@ -86,27 +104,41 @@ router.post('/', async (req, res) => {
 
     await client.query('COMMIT')
 
-    res.json({ ...sale, total })
+    return res.json({
+      ...sale,
+      total,
+    })
   } catch (err) {
     await client.query('ROLLBACK')
-    res.status(500).json({ error: 'Sale creation failed' })
+
+    console.error('🔥 SALES CREATE ERROR:', err)
+
+    return res.status(500).json({
+      error: 'Sale creation failed',
+      details: err instanceof Error ? err.message : err,
+    })
   } finally {
     client.release()
   }
 })
 
-/**
- * DELETE SALE (CASCADE)
- */
+// =========================
+// DELETE SALE
+// =========================
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params
 
-    await db.query(`DELETE FROM sales WHERE id = $1`, [id])
+    await pool.query(`DELETE FROM sales WHERE id = $1`, [id])
 
-    res.json({ message: 'Sale deleted' })
+    return res.json({ message: 'Sale deleted' })
   } catch (err) {
-    res.status(500).json({ error: 'Delete failed' })
+    console.error('🔥 SALES DELETE ERROR:', err)
+
+    return res.status(500).json({
+      error: 'Delete failed',
+      details: err instanceof Error ? err.message : err,
+    })
   }
 })
 
