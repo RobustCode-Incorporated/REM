@@ -11,12 +11,19 @@ export const api = axios.create({
 })
 
 /**
- * Optional: Request interceptor
+ * =========================
+ * REQUEST INTERCEPTOR
+ * =========================
+ * Inject JWT token automatically if available
  */
 api.interceptors.request.use(
   (config) => {
-    // future: auth token injection
-    // config.headers.Authorization = `Bearer ${token}`
+    const token = localStorage.getItem('token')
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+
     return config
   },
   (error) => {
@@ -25,7 +32,10 @@ api.interceptors.request.use(
 )
 
 /**
- * Optional: Response interceptor
+ * =========================
+ * RESPONSE INTERCEPTOR
+ * =========================
+ * Centralized error handling
  */
 api.interceptors.response.use(
   (response) => response,
@@ -34,27 +44,46 @@ api.interceptors.response.use(
       url: error.config?.url,
       status: error.response?.status,
       message: error.message,
+      data: error.response?.data,
     })
+
+    /**
+     * OPTIONAL: Auto logout on 401
+     */
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+    }
 
     return Promise.reject(error)
   }
 )
 
 /**
- * Generic helpers (clean architecture)
+ * =========================
+ * CLEAN API CLIENT WRAPPER
+ * =========================
+ * Used by stores for consistency
  */
 export const apiClient = {
-  get: <T = any>(url: string) =>
-    api.get<T>(url).then(res => res.data),
+  get: async <T = any>(url: string) => {
+    const res = await api.get<T>(url)
+    return res.data
+  },
 
-  post: <T = any>(url: string, data?: any) =>
-    api.post<T>(url, data).then(res => res.data),
+  post: async <T = any>(url: string, data?: any) => {
+    const res = await api.post<T>(url, data)
+    return res.data
+  },
 
-  put: <T = any>(url: string, data?: any) =>
-    api.put<T>(url, data).then(res => res.data),
+  put: async <T = any>(url: string, data?: any) => {
+    const res = await api.put<T>(url, data)
+    return res.data
+  },
 
-  delete: <T = any>(url: string) =>
-    api.delete<T>(url).then(res => res.data),
+  delete: async <T = any>(url: string) => {
+    const res = await api.delete<T>(url)
+    return res.data
+  },
 }
 
 export default api

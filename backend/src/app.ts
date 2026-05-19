@@ -5,6 +5,8 @@ import customersRoutes from './routes/customers.routes'
 import productsRoutes from './routes/products.routes'
 import salesRoutes from './routes/sales.routes'
 import dashboardRoutes from './routes/dashboard.routes'
+import authRoutes from './modules/auth/auth.routes'
+
 
 const app = express()
 
@@ -25,5 +27,7 @@ app.use('/customers', customersRoutes)
 app.use('/products', productsRoutes)
 app.use('/sales', salesRoutes)
 app.use('/dashboard', dashboardRoutes)
+app.use('/auth', authRoutes)
+
 
 export default app
